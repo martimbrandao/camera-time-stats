@@ -1,4 +1,4 @@
-# DeepFace Recognition
+# Facial Detection and Recognition from videos
 
 This project provides a GUI for face recognition using DeepFace, with options for single video and multi-video processing.
 
