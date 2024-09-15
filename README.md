@@ -6,22 +6,22 @@ This project provides a GUI for face recognition using DeepFace, with options fo
 # Installation
 
 Clone this repository:
-- git clone https://github.com/AKhromin/Computer-Vision-for-NGO-Problems.git
-- cd Computer-Vision-for-NGO-Problems
+- 'git clone https://github.com/AKhromin/Computer-Vision-for-NGO-Problems.git'
+- 'cd Computer-Vision-for-NGO-Problems'
 
 Install the required packages:
-- pip install -r requirements.txt
+- 'pip install -r requirements.txt'
 
 
 # Usage
 
 Single Video Version: 
 - To run the single video version:
-  - python run_face_recognition.py 1
+  - 'python run_face_recognition.py 1'
 
 Multi-Video Version:
 - To run the multi-video version:
-  - python run_face_recognition.py 2
+  - 'python run_face_recognition.py 2'
 
 
 # Features
