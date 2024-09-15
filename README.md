@@ -18,6 +18,7 @@ Copypip install -r requirements.txt
 Single Video Version: 
 - To run the single video version:
   - python run_face_recognition.py 1
+
 Multi-Video Version:
 - To run the multi-video version:
   - python run_face_recognition.py 2
