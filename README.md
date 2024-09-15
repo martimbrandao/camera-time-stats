@@ -6,14 +6,11 @@ This project provides a GUI for face recognition using DeepFace, with options fo
 # Installation
 
 Clone this repository:
-
-git clone https://github.com/AKhromin/Computer-Vision-for-NGO-Problems.git
-
-cd Computer-Vision-for-NGO-Problems
+- git clone https://github.com/AKhromin/Computer-Vision-for-NGO-Problems.git
+- cd Computer-Vision-for-NGO-Problems
 
 Install the required packages:
-
-pip install -r requirements.txt
+- pip install -r requirements.txt
 
 
 # Usage
