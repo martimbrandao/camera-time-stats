@@ -17,6 +17,8 @@ import multiprocessing
 from multiprocessing import Lock
 import threading
 
+multiprocessing.freeze_support()
+
 backends = ["opencv", "ssd", "dlib", "mtcnn", "retinaface"]
 models = ["VGG-Face", "Facenet", "Facenet512", "OpenFace", "DeepFace", "DeepID", "ArcFace", "Dlib", "SFace"]
 metrics = ["cosine", "euclidean", "euclidean_l2"]
@@ -104,31 +106,19 @@ class SingleVidRecognizer:
         """
         SingleVidRecognizer() will initialize the required variables and the face detector
         """
+        # Params
         self.known_faces_only = False
         self.csv_file = None
-        self.SIMILARITY_THRESHOLD = 0.8
+        self.similarity_threshold = 0.35
         self.FRAME_SKIP = 5  # Process every 5th frame
-        self.RESIZE_FACTOR = 0.5  # Resize frame to 50% of original size
-        self.CHOSEN_MODEL = models[0]  # VGG-Face
+        self.RESIZE_FACTOR = 1.0  # Resize frame to 50% of original size
+        self.CHOSEN_MODEL = "Facenet512"  # "VGG-Face" (96.7%), "Facenet512" (98.4%)
         self.CHOSEN_METRIC = metrics[0]  # Cosine
         self.CHOSEN_BACKEND = backends[0]  # opencv
         self.DISPLAY_SCALE = 1.5  # Scale factor for display
         self.BATCH_SIZE = 32
         self.USE_GPU = True if cv2.cuda.getCudaEnabledDeviceCount() > 0 else False
-
-        self.num_processes = multiprocessing.cpu_count()
-        self.manager = multiprocessing.Manager()
-        self.db_embeddings = self.manager.dict()
-        self.face_snapshots = self.manager.dict()
-        self.person_count = multiprocessing.Value('i', 0)
-        self.person_status = self.manager.dict()
-        self.last_detection_time = self.manager.dict()
-        self.db_embeddings_lock = Lock()
-        self.face_snapshots_lock = Lock()
-
-        self.frame_queue = queue.Queue(maxsize=30)
-        self.process_event = threading.Event()
-
+        
         # Initialize YuNet face detector
         self.face_detector = cv2.FaceDetectorYN.create(
             model="face_detection_yunet_2023mar.onnx",
@@ -140,7 +130,27 @@ class SingleVidRecognizer:
             backend_id=cv2.dnn.DNN_BACKEND_OPENCV,
             target_id=cv2.dnn.DNN_TARGET_CPU
         )
+        self.clear()
 
+    def clear(self):
+        """
+        clear() will clear all variables to start a new analysis
+        :return:
+        """
+        print('Initializing recognizer...')
+        print('Similarity threshold: %f' % self.similarity_threshold)
+        self.num_processes = multiprocessing.cpu_count()
+        self.manager = multiprocessing.Manager()
+        self.db_embeddings = self.manager.dict()
+        self.face_snapshots = self.manager.dict()
+        self.person_count = multiprocessing.Value('i', 0)
+        self.person_status = self.manager.dict()
+        self.last_detection_time = self.manager.dict()
+        self.db_embeddings_lock = Lock()
+        self.face_snapshots_lock = Lock()
+        self.frame_queue = queue.Queue(maxsize=30)
+        self.process_event = threading.Event()
+        
     def set_known_faces_only(self, known_faces_only):
         """
         set_known_faces_only() will set the flag to process only known faces
@@ -159,6 +169,14 @@ class SingleVidRecognizer:
         with open(self.csv_file, 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(["PersonID", "StartTime", "EndTime", "Duration", "FrameCount"])
+            
+    def set_similarity_threshold(self, similarity_threshold):
+        """
+        set_similarity_threshold() will set the similarity threshold parameter
+        :param similarity_threshold:
+        :return:
+        """
+        self.similarity_threshold = similarity_threshold
 
     def log_to_csv(self, person_id, start_time, end_time, duration, frame_count):
         """
@@ -227,7 +245,10 @@ class SingleVidRecognizer:
         """
         scales = [0.5, 1.0, 1.5]
         embeddings = []
-        embedding_size = 2622
+        if self.CHOSEN_MODEL == 'Facenet512':
+            embedding_size = 512
+        else:
+            embedding_size = 2622
         for scale in scales:
             try:
                 resized = cv2.resize(face_img, (0, 0), fx=scale, fy=scale)
@@ -237,6 +258,8 @@ class SingleVidRecognizer:
                 embeddings.append(np.array(emb[0]['embedding']))
             except Exception as e:
                 print(f"Error in embedding calculation: {e}")
+                #import pdb
+                #pdb.set_trace()
         if embeddings:
             return np.mean(embeddings, axis=0)
         else:
@@ -295,11 +318,11 @@ class SingleVidRecognizer:
         self.last_detection_time[name] = current_time
 
         # After detecting a person for several frames (e.g., after 5 frames), update the face snapshot
-        if face_img is not None and self.person_status[name]['detection_count'] > 5:
-            # Optionally, you can also include a heuristic to check image quality (e.g., brightness)
-            if self.is_better_snapshot(face_img):
-                with self.face_snapshots_lock:
-                    self.face_snapshots[name] = face_img
+        #if face_img is not None and self.person_status[name]['detection_count'] > 5:
+        #    # Optionally, you can also include a heuristic to check image quality (e.g., brightness)
+        #    if self.is_better_snapshot(face_img):
+        #        with self.face_snapshots_lock:
+        #            self.face_snapshots[name] = face_img
 
     def check_disappeared_faces(self, current_faces, current_time, frame_count):
         """
@@ -368,19 +391,19 @@ class SingleVidRecognizer:
                 x, y, w, h = map(int, face[:4])
                 if w < min_face_size or h < min_face_size:
                     continue
-
-                face_img = frame[y:y + h, x:x + w]
+                
+                face_img = frame[max(y,0):min(y + h,frame.shape[0]), max(x,0):min(x + w,frame.shape[1]), :]
                 embedding = self.get_multi_scale_embedding(face_img)
 
                 if self.known_faces_only:
                     closest_match, min_distance = self.find_closest_match(embedding)
-                    if min_distance <= self.SIMILARITY_THRESHOLD:
+                    if min_distance <= self.similarity_threshold:
                         name = closest_match
                     else:
                         continue
                 else:
                     closest_match, min_distance = self.find_closest_match(embedding)
-                    if min_distance <= self.SIMILARITY_THRESHOLD:
+                    if min_distance <= self.similarity_threshold:
                         name = closest_match
                     else:
                         with self.person_count.get_lock():
@@ -455,20 +478,31 @@ class SingleVidRecognizer:
         if summary.empty:
             print("No faces detected in the video. Skipping graph creation")
             return
+        
+        # Save face pictures
+        for i, (name, duration, appearances) in enumerate(
+                zip(summary['PersonID'], summary['Duration'], summary['Appearances'])):
+            if name in self.face_snapshots:
+                face_img_save = cv2.resize(self.face_snapshots[name], (100, 100))
+                cv2.imwrite(os.path.splitext(csv_file_path)[0] + "_person_" + name + ".jpg", face_img_save)
 
-        fig, ax = plt.subplots(figsize=(15, 10))
+        # PDF of top N people
+        top_people = 50
+        if len(summary) > top_people:
+            summary = summary[-top_people:]
+        fig, ax = plt.subplots(figsize=(10, int(4*max(1,len(summary['PersonID'])/4))))
         bars = ax.barh(summary['PersonID'], summary['Duration'], color='skyblue')
 
         for i, (name, duration, appearances) in enumerate(
                 zip(summary['PersonID'], summary['Duration'], summary['Appearances'])):
             if name in self.face_snapshots:
                 face_img = cv2.cvtColor(self.face_snapshots[name], cv2.COLOR_BGR2RGB)
-                face_img = cv2.resize(face_img, (100, 100))
+                face_img = cv2.resize(face_img, (50, 50))
                 im = OffsetImage(face_img)
 
                 txt = TextArea(name, textprops=dict(ha='center', va='top', fontsize=8, color='black'))
 
-                vpacker = VPacker(children=[im, txt], align="center", pad=0, sep=5)
+                vpacker = VPacker(children=[im, txt], align="center", pad=0, sep=0)
 
                 ab = AnnotationBbox(vpacker, (0, i), xybox=(-60, 0),
                                     frameon=False,
@@ -476,7 +510,7 @@ class SingleVidRecognizer:
                                     boxcoords="offset points",
                                     pad=0.5)
                 ax.add_artist(ab)
-
+                
         plt.subplots_adjust(left=0.4)
         ax.set_yticks([])
 

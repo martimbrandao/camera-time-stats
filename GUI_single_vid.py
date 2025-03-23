@@ -19,13 +19,14 @@ class SingleVidGUI:
         self.images_folder = ""
         self.video_path = ""
         self.min_face_size = tk.StringVar(value="30")
+        self.similarity_threshold = tk.StringVar(value="0.35")
         self.show_video = tk.BooleanVar(value=True)
 
         self.video_label = None
         self.cap = None
         self.frame_count_label = None
         self.create_widgets()
-
+        
         self.recognizer = SingleVidRecognizer()
 
     def create_widgets(self):
@@ -56,11 +57,15 @@ class SingleVidGUI:
         self.frame_count_label.place(x=560, y=730)
 
         # Minimum face size input
-        tk.Label(self.window, text="Minimum Face Size:").place(x=50, y=700)
-        tk.Entry(self.window, textvariable=self.min_face_size, width=10).place(x=180, y=700)
+        tk.Label(self.window, text="Minimum Face Size (reduce to detect small faces):").place(x=50, y=700)
+        tk.Entry(self.window, textvariable=self.min_face_size, width=10).place(x=340, y=700)
 
+        # Similarity threshold input
+        tk.Label(self.window, text="Similarity Threshold (reduce to avoid mismatches):").place(x=50, y=725)
+        tk.Entry(self.window, textvariable=self.similarity_threshold, width=10).place(x=340, y=725)
+        
         # Show video checkbox
-        tk.Checkbutton(self.window, text="Show Video", variable=self.show_video).place(x=300, y=700)
+        tk.Checkbutton(self.window, text="Show Video", variable=self.show_video).place(x=850, y=700)
 
         # Start processing button
         tk.Button(self.window, text="Start Processing", command=self.start_processing).place(x=560, y=700)
@@ -145,11 +150,21 @@ class SingleVidGUI:
         except ValueError:
             messagebox.showerror("Error", "Minimum face size must be a valid integer.")
             return
+            
+        try:
+            similarity_threshold = float(self.similarity_threshold.get())
+        except ValueError:
+            messagebox.showerror("Error", "Similarity threshold must be a valid float number.")
+            return
 
         if self.images_folder:
             if not os.path.exists(self.images_folder) or len(os.listdir(self.images_folder)) == 0:
                 messagebox.showwarning("Warning", "The selected folder is empty or doesn't exist. All faces will be detected.")
                 self.images_folder = ""
+        
+        # clear recognizer to start a new analysis
+        self.recognizer.set_similarity_threshold(similarity_threshold)
+        self.recognizer.clear()
 
         # Show detection mode popup
         self.show_detection_mode_popup()
