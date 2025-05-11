@@ -13,10 +13,34 @@ Faces are saved as images, statistics as a CSV file, and a summary as a PDF.
   ```
   python -m pip install virtualenv
   ```
+- Create a virtualenv environment and activate it.
 - Install requirements:
   ```
   pip install tensorflow==2.10.0 tensorflow_cpu==2.10.0 tensorflow_intel==2.10.0 keras==2.10.0 deepface==0.0.93 numpy==1.26.4 matplotlib scipy torch pyinstaller
   ```
+
+## Installation (Ubuntu 22.04, with virtualenv)
+
+Tested on CPU, Python 3.10.12:
+
+```
+python -m pip install virtualenv
+virtualenv venv
+source venv/bin/activate
+pip install tensorflow==2.10.0 keras==2.10.0 deepface==0.0.93 numpy==1.26.4 matplotlib scipy torch pyinstaller
+```
+
+## Installation (Ubuntu 22.04, with venv, based on https://www.tensorflow.org/install/pip)
+
+Tested on GPU, Python 3.10.12:
+
+```
+python3 -m venv tf
+source tf/bin/activate
+pip install --upgrade pip
+pip install tensorflow[and-cuda]
+pip install deepface matplotlib scipy tf-keras torch
+```
 
 ## Running
 
